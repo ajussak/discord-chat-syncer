@@ -1,4 +1,4 @@
-#Discord Chat Syncer
+# Discord Chat Syncer
 
 Discord Bot to sync text channels between servers
 
