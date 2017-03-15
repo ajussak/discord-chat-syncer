@@ -1,5 +1,6 @@
 {
   "token": "PUT TOKEN HERE",
+  "enable_anonymous": false,
   "syncedChannels":
   [
   ]
