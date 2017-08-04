@@ -1,6 +1,12 @@
 {
-  "token": "PUT TOKEN HERE",
-  "syncedChannels":
-  [
-  ]
+    "banned_users": [],
+    "delete_banned_users_messages": true,
+    "enable_anonymity": false,
+    "super_admin_id": "",
+    "synced_channels": [
+        "343041456660938754",
+        "291996196115972117"
+    ],
+    "text_only_messages_filtering": false,
+    "token": "MzQyOTAyMzc2ODMyNjk2MzMw.DGYUIA.WlOfQD0cGTDapUAwSpnoJlCm1mw"
 }
