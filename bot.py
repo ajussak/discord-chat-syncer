@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
+from typing import Optional
 
 import discord
 import json
 import logging
 import os
 
-from discord import Embed
+from discord import Embed, ChannelType, Member
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.INFO)
@@ -43,36 +44,74 @@ client = discord.Client()
 async def on_message(message):
     if message.author.id != client.user.id and message.channel.id in config["synced_channels"] \
             and not message.content.startswith("!"):
-        if not config["enable_anonymity"]:
-            message.content = "**{0}@{1}**\n".format(message.author.name, message.channel.server.name) + message.content
-        for object in message.attachments:
-            if message.content != "":
-                message.content += "\n"
-            message.content += object["url"]
-        broadcast_list = ""
-        for synced_channel_id in config["synced_channels"]:
-            if synced_channel_id != message.channel.id:
-                channel = client.get_channel(synced_channel_id)
-                if channel is None:
-                    logger.error("Channel ID:%s doesn't exist or the bot is not allowed.", synced_channel_id)
-                else:
-                    emb = None
-                    if len(message.embeds) >= 1:
-                        emb = Embed(**message.embeds[0])
-                    print(emb.to_dict())
-                    send_message = await client.send_message(channel, message.content, embed=emb)
-                    broadcast_list += "\n - {0} (ID:{1}) : Message ID:{2}".format(channel.server.name,
-                                                                                  channel.server.id,
-                                                                                  send_message.id)
-        logger.info("Message ID:%s posted by %s (ID:%s) from server %s (ID:%s) broadcasted to : %s",
-                    message.id, message.author.name, message.author.id, message.server.name, message.server.id,
-                    broadcast_list)
-    elif message.content == '!setsync' and message.author == message.channel.server.owner:
+        if message.author.id not in config['banned_users']:
+            if not config["enable_anonymity"]:
+                message.content = "**{0}@{1}**\n".format(message.author.name, message.channel.server.name) + message.content
+            for object in message.attachments:
+                if message.content != "":
+                    message.content += "\n"
+                message.content += object["url"]
+            broadcast_list = ""
+            for synced_channel_id in config["synced_channels"]:
+                if synced_channel_id != message.channel.id:
+                    channel = client.get_channel(synced_channel_id)
+                    if channel is None:
+                        logger.error("Channel ID:%s doesn't exist or the bot is not allowed.", synced_channel_id)
+                    else:
+                        emb = None
+                        if len(message.embeds) >= 1:
+                            emb = Embed(**message.embeds[0])
+                        send_message = await client.send_message(channel, message.content, embed=emb)
+                        broadcast_list += "\n - {0} (ID:{1}) : Message ID:{2}".format(channel.server.name,
+                                                                                      channel.server.id,
+                                                                                      send_message.id)
+            logger.info("Message ID:%s posted by %s (ID:%s) from server %s (ID:%s) broadcasted to : %s",
+                        message.id, message.author.name, message.author.id, message.server.name, message.server.id,
+                        broadcast_list)
+        elif config['delete_banned_users_messages']:
+            try:
+                await client.delete_message(message)
+            except discord.Forbidden:
+                pass
+
+    elif message.channel.type == ChannelType.text and message.content == '!setsync' \
+            and message.author == message.channel.server.owner:
         for channel in message.channel.server.channels:
             if channel.id in config["synced_channels"]:
                 config["synced_channels"].remove(channel.id)
-        config["synced_channels"].append(channel.id)
+        config["synced_channels"].append(message.channel.id)
         save_config(config)
         await client.send_message(message.channel, "Synchronization enabled here.")
+
+    elif message.channel.type == ChannelType.private and message.author.id == config['super_admin_id']:
+        args = message.content.split(' ')
+        if len(args) > 1:
+            user_data = get_user(args[1])
+            if user_data is not None:
+                if args[0] == 'ban':
+                    if user_data[0] not in config['banned_users']:
+                        config['banned_users'].append(user_data[0])
+                        save_config(config)
+                        await client.send_message(message.channel, user_data[1] + ' is banned')
+                    else:
+                        await client.send_message(message.channel, user_data[1] + ' is already banned')
+                if args[0] == 'unban':
+                    if user_data[0] in config['banned_users']:
+                        config['banned_user'].remove(user_data[0])
+                        save_config(config)
+                        await client.send_message(message.channel, user_data[1] + ' is unbanned')
+                    else:
+                        await client.send_message(message.channel, user_data[1] + ' is not banned')
+
+
+def get_user(id: str):
+    data = id.split('#')
+
+    for member in client.get_all_members():
+        if member.id == id:
+            return [id, member.name+'#'+member.discriminator]
+        elif member.name == data[0] and member.discriminator == data[1]:
+            return [member.id, id]
+    return None
 
 client.run(config["token"])
